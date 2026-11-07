@@ -38,7 +38,7 @@ Dedupe against the PR head: a finding on an outdated line may already be fixed.
 
 1. Read the finding and the code at the PR head; verify it is real (reproduce with a
    single test case when it is behavioural).
-2. Fix the root cause in a scratch worktree `/tmp/psalm-pr-<n>`, mirroring sibling guards
+2. Fix the root cause in a scratch worktree `~/psalm-work/pr-<n>`, mirroring sibling guards
    and other call sites of the same mistake; add a test case for the finding that fails
    before and passes after.
 3. Single test cases only, never suites. Commit, plain `git push` to the fork remote

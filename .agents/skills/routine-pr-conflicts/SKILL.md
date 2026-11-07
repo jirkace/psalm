@@ -41,7 +41,7 @@ Such a PR gets the **rebase procedure** below, whether or not it currently confl
 
 1. `git fetch origin master` and fetch the PR head from the fork remote
    (`git_origin_jirkace`, the user's fork; check with `git remote -v`).
-2. Create a scratch worktree under `/tmp/psalm-pr-<n>` on the PR branch. It needs its own
+2. Create a scratch worktree under `~/psalm-work/pr-<n>` on the PR branch. It needs its own
    `vendor/` (`cp -R`, never a symlink) only if you run Psalm or a test in it.
 3. `git merge origin/master` into the PR branch (a merge commit, not a rebase: no force
    push, review history stays intact). Resolve conflicts by understanding both sides,
@@ -60,7 +60,7 @@ Such a PR gets the **rebase procedure** below, whether or not it currently confl
 Use a rebase *instead of* the merge from step 2 for these PRs; a maintainer asked for a
 linear history, so a merge commit does not satisfy them.
 
-1. Scratch worktree `/tmp/psalm-pr-<n>`; `git fetch origin master` and fetch the PR branch
+1. Scratch worktree `~/psalm-work/pr-<n>`; `git fetch origin master` and fetch the PR branch
    from the fork remote (`git_origin_jirkace`). Remember the fetched branch sha as `<old>`.
 2. `git rebase origin/master`. Resolve each conflict by understanding both sides. In
    provider files keep both sides' entries (git factors the shared closing `}` / `],`
@@ -74,8 +74,14 @@ linear history, so a merge commit does not satisfy them.
    If the lease is rejected (someone pushed meanwhile), stop and report; do not retry
    without re-fetching and re-checking what changed.
 5. Confirm with `gh pr view <n> --repo vimeo/psalm --json headRefOid,mergeable` (the head
-   updates after a few seconds). Do **not** reply to or resolve the maintainer's comment;
-   put a proposed one-line reply in the report.
+   updates after a few seconds).
+6. **Only after the push succeeded**, post a PR comment that mentions the maintainer who
+   asked (a real `@login`, e.g. `@orklah`) and says the PR is rebased onto master, with the
+   new head sha and what conflicted (one or two sentences). Never before the push, and
+   never claim a push that was rejected. Do not resolve the maintainer's comment thread.
+
+The user's standing instruction: whenever a maintainer asks for a rebase, always do it,
+force-push (with the lease) and comment as in step 6, without asking again.
 
 Force-pushing is allowed only here, only to the user's fork branch, only with the lease.
 

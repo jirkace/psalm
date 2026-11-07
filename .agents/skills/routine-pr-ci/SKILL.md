@@ -16,7 +16,11 @@ gh pr list --repo vimeo/psalm --author @me --state open --limit 100 --json numbe
 gh pr checks <n> --repo vimeo/psalm
 ```
 
-Failing = any check with `fail`. `pending` is not a failure; leave it for the next run.
+Failing = any check with `fail`, **except the `label` check**. `label` fails on almost every PR
+until a maintainer adds a `release:*` label; the user cannot add labels, so it is never a
+failure to fix, never a reason to open a PR for CI work, and not worth listing per PR. In the
+report mention it once at most ("`label` pending maintainers on N PRs"). A PR whose only red
+check is `label` counts as green. `pending` is not a failure; leave it for the next run.
 For run lookups use `gh run list --repo vimeo/psalm --commit <sha>` (`--branch` can be
 stale). Make sure the run belongs to the PR's current head sha.
 
@@ -33,7 +37,7 @@ Classify before touching code:
 | Merge conflict / PR not mergeable | skill `routine-pr-conflicts` first |
 | Test failure caused by the PR | reproduce that single case locally on branch, fix the root cause, add tests for edge cases (AGENTS.md "Fixing bugs") |
 | Test failure also on `master` (flaky or broken base) | confirm with the same case on master; report, do not "fix" in the PR |
-| `label` check | add a `release:*` label (`gh pr edit <n> --add-label release:fix`) |
+| `label` check | ignore (see above); do not try to add labels |
 | "Check backward compatibility" | skill `plugin-api-bc` |
 | Self-analysis / Psalm issues | one full `flock /tmp/psalm-self-analysis.lock timeout 300 ./psalm --no-cache --output-format=compact`, diff against master; no suppressions/baseline edits |
 | phpcs / code style | fix per `phpcs` on the changed files, check exit code |
@@ -42,7 +46,7 @@ Classify before touching code:
 
 ## 3. Fix, push, re-check
 
-1. Work in a scratch worktree `/tmp/psalm-pr-<n>` on the PR branch (own `vendor/` copy).
+1. Work in a scratch worktree `~/psalm-work/pr-<n>` on the PR branch (own `vendor/` copy).
 2. Fix the root cause. No workarounds from AGENTS.md "No workarounds" (no suppress, no
    baseline, no fixture changes to dodge behaviour). If only a workaround is possible,
    stop and report.
