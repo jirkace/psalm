@@ -42,13 +42,15 @@ Dedupe against the PR head: a finding on an outdated line may already be fixed.
    and other call sites of the same mistake; add a test case for the finding that fails
    before and passes after.
 3. Single test cases only, never suites. Commit, plain `git push` to the fork remote
-   (`git_origin_jirkace`), never `origin`, never `--force`. No `Claude-Session:` trailer.
+   (`git_origin_jirkace`), never `origin`, never `--force` (only the rebase procedure may force, with a lease). No `Claude-Session:` trailer.
 4. If the finding is wrong, do not change code; say why in the report.
 5. After the push, resolve the bot thread (GraphQL `resolveReviewThread`) only when it
    is fixed or clearly a false positive.
 
 ## 3. Handle maintainer comments (conservative)
 
+- A request to rebase: do it with the rebase procedure of skill `routine-pr-conflicts`
+  (section 2b, includes `--force-with-lease`), even when the PR has no conflict.
 - A concrete, unambiguous change request (rename, add a test, fix a typo): implement it,
   push as above, and put a proposed one-line reply in the report.
 - Questions, design disagreements, or anything needing a decision: do not act and do not

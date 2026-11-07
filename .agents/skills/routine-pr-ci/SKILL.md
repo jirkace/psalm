@@ -48,7 +48,7 @@ Classify before touching code:
    stop and report.
 3. Prove with single test cases (fails before, passes after if it is the PR's own test).
 4. Commit, plain `git push` to the fork remote (`git_origin_jirkace`); never `origin`,
-   never `--force`. No `Claude-Session:` trailer in commits.
+   never `--force` (a maintainer-requested rebase is handled by `routine-pr-conflicts`). No `Claude-Session:` trailer in commits.
 5. Poll `gh pr checks <n>` until the new run finishes, or report it as pending.
 
 ## 4. Report
