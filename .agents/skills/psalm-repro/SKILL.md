@@ -83,3 +83,28 @@ test file.
   `--branch`, which can be stale.
 - CircleCI `test-with-real-projects`: read the failing action's `output_url` from the
   v1.1 API (`/project/gh/<owner>/psalm/<build>`).
+
+## Reproducing language server and diff-mode bugs
+
+"Can't reproduce" is only worth saying after the edits that cause the bug were tried, not
+only the ones that are easy to script (#10689 was reported fixed first, reproduced later):
+
+- **Change the length of the edited text.** Replacing a line by one of the same size keeps
+  every offset; delete lines, add lines, shorten and lengthen a body. Stale or shifted
+  diagnostics (diff mode keeps issues by file offset) only show when offsets move.
+- **Drive a persistent server.** `references/lsp-client.php <psalm-language-server> <root>
+  <scenario>` starts one `psalm-language-server`, sends `didOpen`, then `didChange`/`didSave`
+  (scenarios `replace`, `delete`, `typing`, `save`, `incremental`) and prints the last
+  `publishDiagnostics` per step as `code@Lstart-end`. The server advertises full-text sync
+  (`change: 1`), so incremental ranges are ignored. Run it on a scratch project with the
+  issue's file as `src/A.php` and restore the file afterwards.
+- **Method diffing is language-server only.** The CLI has `$is_diff = false` hard-coded, so
+  `diff_methods` is on only in `ProjectAnalyzer::serverMode()`; an old report about the CLI
+  does not apply to current master.
+- To find where stale data comes from, log `Analyzer::shiftFileOffsets()` (diff map, deletion
+  ranges, existing issues with their `from`) and `removeExistingDataForFile()` /
+  `getExistingIssuesForFile()` (the range asked for): an existing issue outside both the
+  diff map and the deletion ranges survives unshifted.
+- A diff unit test (`FileDiffTest`) pins the ranges; the end-to-end check is the client
+  script, since `tests/LanguageServer` is an async protocol harness.
+

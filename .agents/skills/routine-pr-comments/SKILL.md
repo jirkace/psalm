@@ -161,6 +161,12 @@ Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
 - **Trait before parent.** Populating a class imports traits before the parent, so anything
   that stands in for a missing member (the empty constructor) hides the trait's member and
   must be removed before the trait import (#13084).
+- **Before "can't reproduce", vary the edit, not only the snippet.** A reply that said the
+  language server shows no stale diagnostics was wrong because the test replaced a line
+  instead of deleting it (#10689); the reporter, a maintainer and a reviewer had it right.
+  Use the recipe in skill `psalm-repro` (section on the language server). A comment that
+  only repeats a generic request ("share your version") is noise; and a comment written
+  by the assistant must say what it ran and what it did not cover.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
