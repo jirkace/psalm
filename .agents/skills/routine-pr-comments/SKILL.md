@@ -167,6 +167,34 @@ Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
   Use the recipe in skill `psalm-repro` (section on the language server). A comment that
   only repeats a generic request ("share your version") is noise; and a comment written
   by the assistant must say what it ran and what it did not cover.
+- **A check on a type has to look through template params.** `Atomic::isIterable()` (and
+  similar `is*()` helpers) is false for a `TTemplateParam` whatever its bound: replace it by
+  the atomics of its bound, recursively, and let an unbounded template (`as mixed`) pass
+  like `mixed` does (#13127).
+- **Control flow that leaves more than one level is recorded on the innermost scope only.**
+  `break 2`/`continue 2` in a nested loop or switch is on the nested loop scope, so a guard
+  that reads `loop_scope->final_actions` misses it; scan the AST with a depth counter
+  (closures and classes excluded) (#13205).
+- **A heuristic exemption has to be narrow enough to name its evidence.** "The class calls
+  `isset($this->p)` somewhere" hid genuine uninitialised properties; "every read outside
+  the constructor is under an `isset` of it, and the property is private" is checkable and
+  was accepted in spirit (#13085). Say what the exemption does not cover (traits).
+- **Do not add a negation on top of one that already exists.** The polarity flag passed down
+  a reconciliation and an explicit `getNegation()` of the assertions did the same job; doing
+  both gave `$a: true` where the condition is false (#13124). When you introduce an explicit
+  negation, find the flag or the second pass that used to stand in for it.
+- **"Narrower on master" can be unsound.** Before restoring a type that was narrower on the
+  base, run the reduced shape on the base: master's `bool|resource` came from applying an
+  assertion with the wrong polarity (`$x: null` in the else of `null === $x`), losing the
+  other members. Show it in the reply instead of reintroducing the mistake.
+- **A union with `mixed` is `mixed`.** A new message for the same location (`mixed|array`
+  instead of `mixed`) is a new issue in the perf diff; collapse it (#13177).
+- **A finding that is real in the real project needs its baseline.** A true positive in the
+  `test-with-real-projects` project (PHPUnit) turns that CI check red until the baseline in
+  `psalm/endtoend-test-phpunit` is updated; say so in the PR and offer the baseline PR
+  (#13085, as for #13229).
+- **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
+  when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
