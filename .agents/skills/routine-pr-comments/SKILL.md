@@ -148,6 +148,19 @@ Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
 - **Resolve conflicts in big provider files by taking master's file and re-inserting your
   entries** programmatically (extract by entry name, insert at the start of the provider),
   then check that the diff to master only adds lines (#12767).
+- **A new diagnostic can be the twin of one the base already has.** Before changing code for a
+  "new false positive", look for the sibling construct in the base output (the getter next
+  to the one the PR touched, #12818): if the base reports the same issue there, the PR only
+  made the types precise enough to report both, and the answer is the comparison, not a
+  workaround.
+- **An intentional uninitialised state shows in the code.** A typed property the class checks
+  with `isset($this->p)` is allowed to stay unset on an early constructor `return`
+  (#13085); a `finally` runs on every return through it, so its `$this->` assignments belong
+  to the exit states. A token check in a docblock type has to know the grammar around the
+  token: `array{T: int}` has a key `T`, not a template reference (#12734).
+- **Trait before parent.** Populating a class imports traits before the parent, so anything
+  that stands in for a missing member (the empty constructor) hides the trait's member and
+  must be removed before the trait import (#13084).
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
