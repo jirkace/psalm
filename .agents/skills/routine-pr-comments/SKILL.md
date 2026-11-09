@@ -215,6 +215,15 @@ Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
 - **`Fixes #N` only when the diff fixes that issue's symptom**; read the issue again before
   keeping the keyword. (#13313)
 - **Negative tests assert the message**, not just the issue name (`expects Walker`). (#13301)
+- **Run the sibling cases of the area, one by one, before pushing an analyzer change.** Two of
+  my own pushes were red in CI only because an existing case of the same test file broke
+  (`assignmentInBranchOfOr`, a `strtolower(null)` in a plugin analysed with the project). Script
+  it: take the case names with the shared prefix from the provider, run each with `--filter
+  '@name'`, and print only the failures; also run self-analysis for `examples/` code.
+- **Narrow, never widen, what an earlier pass already set.** When a second pass overrides the
+  type of a variable in a context (the body of an `if`), apply it only if it is contained by
+  the current type, or it erases the narrowing the first pass made (`instanceof` on an assigned
+  variable). Keep one state per assignment node, not per variable. (#13361)
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
