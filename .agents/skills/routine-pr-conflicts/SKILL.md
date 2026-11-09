@@ -115,6 +115,23 @@ conflicting PR is often already fixed on master.
 
 Never close a PR that adds behaviour master lacks, and never close one because it is old or red.
 
+## Pitfalls learned resolving many conflicts
+
+- **Provider conflicts:** after "keep both", check duplicate keys per provider and drop the copy
+  that master already has (`DuplicateArrayKey` turned the `build` job red in ten PRs); hunks
+  where git factored a shared tail out (`'php_version' => ...,` then `],`) need the tail
+  between the two entries, not a second `],`. Verify every entry of both parents is still there,
+  verbatim.
+- **`git rebase` of a branch with merge commits** replays history and conflicts almost always;
+  it works when the branch has one real commit (resolve, `rebase --continue`). Otherwise merge
+  master instead and say so.
+- **A merge can break master's tests:** run a few cases master added in the same file, not only
+  the PR's own (a narrower inferred type changes master's expectation: update it when the new
+  type is the correct one).
+- **ComplexMethod after a merge:** extract the biggest repeated block (both branches of an
+  if/else), not the newly added one; small extractions add edges (arguments) and raise the size.
+  Prefer folding the new check into an existing helper. Never raise the limit or suppress.
+
 ## Stop and ask instead of guessing
 
 - The conflict is semantic (both sides changed the same logic differently).

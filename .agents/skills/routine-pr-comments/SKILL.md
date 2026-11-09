@@ -193,6 +193,28 @@ Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
   `test-with-real-projects` project (PHPUnit) turns that CI check red until the baseline in
   `psalm/endtoend-test-phpunit` is updated; say so in the PR and offer the baseline PR
   (#13085, as for #13229).
+- **Find members by the effective method, not by name.** Code that scans class and trait
+  statements for a method name must analyze only what PHP calls: resolve the *called* name (it
+  may be an alias) with `getDeclaringMethodId()` for the analysed class, skip a trait method the
+  class or an outer trait overrides, and read maps such as `trait_visibility_map` from the class
+  the alias appears in. (#12673 nested traits, #13319 aliases: both false negatives of one loop)
+- **A variadic parameter stands for every parameter it covers.** Compare each covered parameter
+  with it (type, by-reference), never skip it; its name is exempt. (#13095)
+- **Don't widen an invalid input to hide it.** Mapping what PHP rejects (an object or array as
+  an `array_column` index) to `array-key` silences a real `TypeError`: report it and leave the
+  invalid part out of the type. (#13313)
+- **Compare type arguments with the comparator, not containment.** `GenericTypeComparator`
+  respects the declared variance; `isContainedBy` per argument treats every template as
+  covariant. (#12955)
+- **Separating two expressions needs alias-aware invalidation.** If `static::$x` and `self::$x`
+  stop sharing an id, a write through one must invalidate what is known of the other. (#13364)
+- **A fix that drops an assignment's type must keep it where the condition is true**, also in
+  nested `&&`/`||`; add a regression test with the nesting. (#13361)
+- **`self` in a closure is its scope, not the caller's class.** Test it across classes (a
+  closure from a trait used by A, called from B). (#13301)
+- **`Fixes #N` only when the diff fixes that issue's symptom**; read the issue again before
+  keeping the keyword. (#13313)
+- **Negative tests assert the message**, not just the issue name (`expects Walker`). (#13301)
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
