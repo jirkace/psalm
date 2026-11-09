@@ -1589,6 +1589,109 @@ final class AssignmentAnalyzer
         return $array->fallback_params[1];
     }
 
+    private static function addDestructuredVarDataFlow(
+        StatementsAnalyzer $statements_analyzer,
+        Codebase $codebase,
+        Context $context,
+        PhpParser\Node\Expr $var,
+        string $list_var_id,
+        int &$removed_taints,
+    ): void {
+        $var_location = new CodeLocation($statements_analyzer->getSource(), $var);
+
+        if (!$context->vars_in_scope[$list_var_id]->parent_nodes) {
+            $assignment_node = DataFlowNode::getForAssignment(
+                $list_var_id,
+                $var_location,
+            );
+
+            $context->vars_in_scope[$list_var_id] =
+                $context->vars_in_scope[$list_var_id]->setParentNodes([
+                    $assignment_node->id => $assignment_node,
+                ])
+            ;
+        } else {
+            if (!$graph = $statements_analyzer->getDataFlowGraphWithSuppressed()) {
+                $context->vars_in_scope[$list_var_id] =
+                    $context->vars_in_scope[$list_var_id]->setParentNodes([]);
+            } else {
+                $event = new AddRemoveTaintsEvent($var, $context, $statements_analyzer, $codebase);
+
+                $added_taints = $codebase->config->eventDispatcher->dispatchAddTaints($event);
+                $removed_taints |= $codebase->config->eventDispatcher->dispatchRemoveTaints($event);
+
+                self::taintAssignment(
+                    $context->vars_in_scope[$list_var_id],
+                    $graph,
+                    $list_var_id,
+                    $var_location,
+                    $removed_taints,
+                    $added_taints,
+                    $codebase->getInputTaints(),
+                );
+            }
+        }
+    }
+
+    /**
+     * The type of a destructured variable: the one its `@var` docblock gives, or else the one of its item
+     *
+     * @param list<VarDocblockComment> $var_comments
+     */
+    private static function getDestructuredVarType(
+        StatementsAnalyzer $statements_analyzer,
+        Context $context,
+        PhpParser\Node\Expr $assign_var,
+        PhpParser\Node\Expr $var,
+        ?string $list_var_id,
+        array $var_comments,
+        ?Union $item_type,
+    ): ?Union {
+        foreach ($var_comments as $var_comment) {
+            if (!$var_comment->type) {
+                continue;
+            }
+
+            try {
+                if ($var_comment->var_id === $list_var_id) {
+                    return TypeExpander::expandUnion(
+                        $statements_analyzer->getCodebase(),
+                        $var_comment->type,
+                        $context->self,
+                        $context->self,
+                        $statements_analyzer->getParentFQCLN(),
+                    )->setFromDocblock();
+                }
+            } catch (UnexpectedValueException $e) {
+                IssueBuffer::maybeAdd(
+                    new InvalidDocblock(
+                        $e->getMessage(),
+                        new CodeLocation($statements_analyzer->getSource(), $assign_var),
+                    ),
+                );
+            }
+        }
+
+        if ($list_var_id !== null
+            && $item_type !== null
+            && $item_type->hasMixed()
+            && !str_contains($list_var_id, '->')
+            && !str_starts_with($list_var_id, '$_')
+            && !$context->collect_initializations
+            && !$context->collect_mutations
+        ) {
+            IssueBuffer::maybeAdd(
+                new MixedAssignment(
+                    'Unable to determine the type that ' . $list_var_id . ' is being assigned to',
+                    new CodeLocation($statements_analyzer->getSource(), $var),
+                ),
+                $statements_analyzer->getSuppressedIssues(),
+            );
+        }
+
+        return $item_type;
+    }
+
     /**
      * @param PhpParser\Node\Expr\List_|PhpParser\Node\Expr\Array_ $assign_var
      * @param list<VarDocblockComment> $var_comments
@@ -1884,94 +1987,28 @@ final class AssignmentAnalyzer
                     );
                 }
 
-                $has_comment_type = false;
-
-                foreach ($var_comments as $var_comment) {
-                    if (!$var_comment->type) {
-                        continue;
-                    }
-
-                    try {
-                        if ($var_comment->var_id === $list_var_id) {
-                            $var_comment_type = TypeExpander::expandUnion(
-                                $codebase,
-                                $var_comment->type,
-                                $context->self,
-                                $context->self,
-                                $statements_analyzer->getParentFQCLN(),
-                            );
-
-                            $var_comment_type = $var_comment_type->setFromDocblock();
-
-                            $new_assign_type = $var_comment_type;
-                            $has_comment_type = true;
-                            break;
-                        }
-                    } catch (UnexpectedValueException $e) {
-                        IssueBuffer::maybeAdd(
-                            new InvalidDocblock(
-                                $e->getMessage(),
-                                new CodeLocation($statements_analyzer->getSource(), $assign_var),
-                            ),
-                        );
-                    }
-                }
+                $new_assign_type = self::getDestructuredVarType(
+                    $statements_analyzer,
+                    $context,
+                    $assign_var,
+                    $var,
+                    $list_var_id,
+                    $var_comments,
+                    $new_assign_type,
+                );
 
                 if ($list_var_id) {
-                    if ($new_assign_type !== null
-                        && $new_assign_type->hasMixed()
-                        && !$has_comment_type
-                        && !str_contains($list_var_id, '->')
-                        && !str_starts_with($list_var_id, '$_')
-                        && !$context->collect_initializations
-                        && !$context->collect_mutations
-                    ) {
-                        IssueBuffer::maybeAdd(
-                            new MixedAssignment(
-                                'Unable to determine the type that ' . $list_var_id . ' is being assigned to',
-                                new CodeLocation($statements_analyzer->getSource(), $var),
-                            ),
-                            $statements_analyzer->getSuppressedIssues(),
-                        );
-                    }
-
                     $context->vars_in_scope[$list_var_id] = $new_assign_type ?: Type::getMixed();
 
                     if ($statements_analyzer->data_flow_graph) {
-                        $var_location = new CodeLocation($statements_analyzer->getSource(), $var);
-
-                        if (!$context->vars_in_scope[$list_var_id]->parent_nodes) {
-                            $assignment_node = DataFlowNode::getForAssignment(
-                                $list_var_id,
-                                $var_location,
-                            );
-
-                            $context->vars_in_scope[$list_var_id] =
-                                $context->vars_in_scope[$list_var_id]->setParentNodes([
-                                    $assignment_node->id => $assignment_node,
-                                ])
-                            ;
-                        } else {
-                            if (!$graph = $statements_analyzer->getDataFlowGraphWithSuppressed()) {
-                                $context->vars_in_scope[$list_var_id] =
-                                    $context->vars_in_scope[$list_var_id]->setParentNodes([]);
-                            } else {
-                                $event = new AddRemoveTaintsEvent($var, $context, $statements_analyzer, $codebase);
-
-                                $added_taints = $codebase->config->eventDispatcher->dispatchAddTaints($event);
-                                $removed_taints |= $codebase->config->eventDispatcher->dispatchRemoveTaints($event);
-
-                                self::taintAssignment(
-                                    $context->vars_in_scope[$list_var_id],
-                                    $graph,
-                                    $list_var_id,
-                                    $var_location,
-                                    $removed_taints,
-                                    $added_taints,
-                                    $codebase->getInputTaints(),
-                                );
-                            }
-                        }
+                        self::addDestructuredVarDataFlow(
+                            $statements_analyzer,
+                            $codebase,
+                            $context,
+                            $var,
+                            $list_var_id,
+                            $removed_taints,
+                        );
                     }
                 }
             }
