@@ -92,6 +92,29 @@ Force-pushing is allowed only here, only to the user's fork branch, only with th
 - Remove the scratch worktree.
 - Report per PR: clean / resolved (what conflicted, how decided) / needs the user.
 
+## 2c. Superseded by master: comment and close, automatically
+
+Check this **before** resolving a conflict that touches source files: maintainers merge parallel fixes, and a
+conflicting PR is often already fixed on master.
+
+1. Update a scratch worktree of `origin/master` (own `vendor/`).
+2. Copy the PR's test files over it and run each case the PR **added** (one case at a time, by `--filter
+   '@caseName'`), or run the PR's snippets as a scratch project when it has no provider case.
+3. Run the same procedure for a PR that is **not** on master as a control: its cases must fail, or the harness
+   proves nothing.
+4. The PR is superseded when every case it adds passes against master's `src` (an invalid-code case that no longer
+   reports means the issue is gone as well). A case that fails only because master changed an expectation (e.g. a
+   type that is now narrower) is not superseded: merge and update the expectation.
+5. Superseded: post one English comment ("**Superseded by master**": what conflicts, which cases or snippets were
+   run, against which master commit, what was not run), then **close the PR yourself** (`gh pr close`). The user
+   authorised this for superseded PRs, in every run. Do not delete the fork branch. Skip PRs a maintainer already
+   closed.
+6. Not superseded but two PRs implement the same thing differently, or master took the opposite design decision
+   (e.g. it skips what the PR evaluates): do not merge and do not close; comment a concrete question for the
+   maintainers and list the PR in the report.
+
+Never close a PR that adds behaviour master lacks, and never close one because it is old or red.
+
 ## Stop and ask instead of guessing
 
 - The conflict is semantic (both sides changed the same logic differently).
