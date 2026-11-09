@@ -75,6 +75,26 @@ attribution line (`🤖 Generated with ...`, session link), title and text match
 
 Lessons so far (maintainers `orklah`, `alies-dev`; Nov 2026):
 
+**The remark that repeats most (about 20 of 35 comments):** the fix is right for the reported case but
+treats something *conditional* as unconditional, which gives a false negative, and the review asks for a
+regression test of that exact case. Before every push, go through this list for the changed code and add a
+test for each item that applies:
+
+1. **Skipped path:** the right of `&&`, `||`, `?:`, `??`; a branch that is not taken.
+2. **Early exit:** `return`, `break`, `continue`, `throw`, `exit` in a branch (assignments or mutations on
+   it don't reach the code after).
+3. **Alias or other spelling:** `self`/`static`/`parent`, a named class, a redeclared property, a trait
+   alias, a class-string.
+4. **Override:** the class (or an outer trait) overrides the method or property being followed.
+5. **Invalidation:** a later write, `unset()`, an impure call, a reference, the offsets of the same
+   variable.
+6. **Variadic, by-reference, first-class callable, trait, nested:** the forms of the construct the fix
+   doesn't mention.
+7. **The perf corpora:** the second most common remark is a new diagnostic in Symfony, Laravel or Drupal
+   (a lost type that became `mixed`); reproduce with a class that *uses* the trait or extends the base,
+   not only with the file alone.
+
+
 - **The perf report is the reviewers' test suite.** They read its issue diff by (type, file,
   message) for symfony, laravel and doctrine. Before pushing, ask which real code shape a
   change turns into a new diagnostic. A new message on an old issue is also "new" there, so
