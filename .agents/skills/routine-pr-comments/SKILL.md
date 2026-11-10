@@ -285,6 +285,15 @@ test for each item that applies:
 - **Hot analyzers:** no allocation per iteration (`Type::getNonFalsyString()` in a loop, a
   `PrettyPrinter` per assignment, `clone $context` when nothing was assigned); hoist or guard.
   A message that embeds printed code must be one line.
+- **A reused worktree is stale until reset.** `git worktree add` fails when `psalm-work/c<n>`
+  exists, and the old checkout can be behind the fork branch (orklah merges master into PR
+  branches; my push of #13433 was rejected). Always `git fetch git_origin_jirkace <branch>`, then
+  `git checkout -B <branch> git_origin_jirkace/<branch>` (not `FETCH_HEAD`, which is per
+  worktree) and check `git log HEAD..git_origin_jirkace/<branch>` before editing. If a push is
+  rejected after the comment was posted, merge the maintainer's commit, push, and correct the
+  comment.
+- **Verify a claim in a posted comment before posting it.** A guessed issue name in a comment
+  (`Risky...` instead of `PossiblyUndefinedMethod`) had to be patched; run the snippet first.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
