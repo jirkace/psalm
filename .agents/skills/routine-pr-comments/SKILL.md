@@ -294,6 +294,24 @@ test for each item that applies:
   comment.
 - **Verify a claim in a posted comment before posting it.** A guessed issue name in a comment
   (`Risky...` instead of `PossiblyUndefinedMethod`) had to be patched; run the snippet first.
+- **Dropping part of a formula is unsound for its negation.** Removing some clauses of the left of
+  `||` made the else branch stronger than the truth; drop all or none. Test `(A && B) || C` shapes.
+- **Do not alias an expression onto another's variable id.** Giving `$a?->b` the id of `$a->b`
+  made every assertion on it (`=== null`, `!isset`) narrow `$a->b->value` while `$a->b` stayed
+  nullable. Add the property assertion only in the polarity where its receivers are known too.
+  A check that re-validates the receiver on every known property also re-reports repeated plain
+  fetches (Psalm's own `DiagnosticTest`), so run the single self-analysis before choosing.
+- **A branch context starts as a copy of the outer one.** `assigned_var_ids` in it contains what the
+  outer scope assigned earlier (a test with `$a = 1;` on top): compare with the outer value before
+  concluding "assigned in this branch".
+- **Probe in the test harness shape, not only on a function parameter.** A global-scope test
+  (`$a = 1;` then the construct) took a different path from a parameter in the CLI probe; and
+  `check-type-exact` compares loosely, so pin a type change with an `assertions` id (global scope)
+  or a side-effect issue.
+- **`git cherry-pick --abort` also undoes the picks that already succeeded in the sequence.** Resolve
+  and `--continue` one pick at a time, and apply the rest as patches (`git diff A B -- files | git apply -3`).
+- **When a comment's fix would need a direction the maintainers have not settled, post one
+  question comment naming the options** (split / new issue name and level / scope), and wait.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
