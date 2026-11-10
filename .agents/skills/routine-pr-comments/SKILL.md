@@ -312,6 +312,29 @@ test for each item that applies:
   and `--continue` one pick at a time, and apply the rest as patches (`git diff A B -- files | git apply -3`).
 - **When a comment's fix would need a direction the maintainers have not settled, post one
   question comment naming the options** (split / new issue name and level / scope), and wait.
+- **Audit of my stale PRs (what maintainers would flag), in this order:**
+  1. *Static checks from the diff and commits* (`gh api pulls/N`, `.../commits`, the `.diff` media
+     type): `@psalm-suppress` added in `src/`, baseline entries added, `issueHandlers`/`ignoreFiles`,
+     `/` in test paths, several tags on one docblock line, moved or duplicated provider keys,
+     `phpcs` and `php -l` on the changed files (check the head out in one scratch worktree). Moved
+     lines show up as added: compare with the removed ones before calling it a violation.
+     `###` headings in a description are allowed for several bugs, and a docs-only PR needs no
+     PHP example.
+  2. *Does each new case pin the change?* Put the PR's test files into a worktree at `origin/master`
+     (`git show <head>:<test file>`, `mkdir -p` for new folders) and run every added provider key
+     with `--filter '@<key>'` and every added test method with `--filter '<method>$'`, one at a
+     time. Cases that pass there are guards; a PR whose cases all pass is a candidate for closing.
+  3. *No-op or tests-only PR:* `git merge-tree --write-tree origin/master <head>`; an empty diff of
+     that tree against `origin/master` means the PR changes nothing (close it with that as the
+     evidence), a diff of test files only means the code is already in master and only the tests
+     would be added (do not close: ask).
+  4. *Closing as superseded needs the cases that passed on the current master by name*, plus what
+     was not checked (which commit fixed it, whether the PR's code is better). Rerun on a freshly
+     fetched master right before closing.
+  5. *Then look at the linked issues* (`Fixes`/`Refs`, `gh api issues/N`): for an open one run its
+     original snippets on master with the strict config of `psalm-contribute` section 7d and post
+     the "no longer reproduces" comment with commit, PHP version, config and real output; never
+     close the issue, and never write a reason that was not seen in the output.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
