@@ -244,6 +244,18 @@ test for each item that applies:
   type of a variable in a context (the body of an `if`), apply it only if it is contained by
   the current type, or it erases the narrowing the first pass made (`instanceof` on an assigned
   variable). Keep one state per assignment node, not per variable. (#13361)
+- **A fallback must be conservative.** Code that models some expression kinds and falls back
+  for the rest (a visitor that collects assignments, a state walker) must treat what it cannot
+  model as "may not run", not "runs". Wrap the PR's own regression case in `== true`, a cast,
+  `match`, `??`, `?->` and run it. (#13361)
+- **Collect a fact where the path is known, not where the fact is created.** Gathering
+  assignments at the assignment also gathered those of branches that later `return` (#13122);
+  collecting them at the `throw`, from the context of that path, is exact. Likewise a context
+  entry (`$foo->bar`) exists after a plain read or after an `if`, so it is no proof that a
+  condition held: store the narrowing together with what it narrowed from (#13409).
+- **Invalidation events to test for every stored narrowing:** `unset`, assignment of the
+  member, reassignment of the parent, end of the branch, early return, a call that forgets
+  properties (`rememberPropertyAssignmentsAfterCall="false"`; by default Psalm remembers).
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
