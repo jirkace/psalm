@@ -256,6 +256,35 @@ test for each item that applies:
 - **Invalidation events to test for every stored narrowing:** `unset`, assignment of the
   member, reassignment of the parent, end of the branch, early return, a call that forgets
   properties (`rememberPropertyAssignmentsAfterCall="false"`; by default Psalm remembers).
+- **Before pushing, diff the test file against master and read every removed or moved line.**
+  Five reviews of one batch complained about the same churn (`nonFinalClassCanBeIdenticalToIterable`
+  and other neighbours moved or re-added): my conflict-resolution and "keep both" scripts reorder
+  provider entries. `git diff origin/master -- tests | grep '^-'` must show only what the PR
+  meant to change.
+- **Every new case must fail on master, and a valid case needs real assertions.** Reviewers ran
+  each case on master: cases that pass there "pin nothing" (`'assertions' => []`, a case on a
+  shape another PR already fixed, an `is empty` case after the semantics changed). Run each new case
+  against master's `src` and drop or rewrite those that pass; keep a passing one only as a named guard.
+- **Fix the other entry points of the same root cause, then list the limits.** A review lists
+  siblings that still fail: `elseif` next to `if` and ternary, the string form next to the array
+  form, `canBeIdentical` next to `canExpressionTypesBeIdentical`, `switch`/`foreach` next to the
+  ternary, `&&` next to `||`, `callable(int &...$i)` next to `callable(int &$i)`. Grep for every
+  caller of the changed helper and every analyzer that builds the same context; what stays
+  unfixed goes into a test that pins the limit.
+- **A cleared or dropped clause is sound only for a single clause.** Dropping whole clauses of
+  the left of `||` is wrong when the left is a conjunction; collecting assigned variables must
+  skip closure and arrow-function bodies. Test the CNF with `(A && B) || C` shapes.
+- **A flag set for one operand must not be stored in the scope.** Making a type possibly
+  undefined for an `isset()` operand leaked into `vars_in_scope` and changed later reads (#13286);
+  a rebuilt body type changed the type after a plain `if ($x = f())` (#13361). Probe: use the
+  variable after the construct, with no `&&`/`||`.
+- **Descriptions go stale and `Fixes #N` must be true.** Re-read the description against the
+  final behaviour (`never` vs `empty`), add `Fixes` for every issue the rule really fixes, and use
+  `Related to` when only part of an old issue is fixed. Close a PR when master fixed it, with the
+  three cases run against master as evidence (#13204).
+- **Hot analyzers:** no allocation per iteration (`Type::getNonFalsyString()` in a loop, a
+  `PrettyPrinter` per assignment, `clone $context` when nothing was assigned); hoist or guard.
+  A message that embeds printed code must be one line.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
