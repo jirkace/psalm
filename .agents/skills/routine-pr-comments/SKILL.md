@@ -434,6 +434,14 @@ test for each item that applies:
 - **Never `git commit --amend` or chain commands after a heredoc on a new line:** the first is refused by
   the classifier and breaks the standing rule; the second ran `git push` and a comment after a failed
   gate. One `&&` chain from the gate to the comment.
+- **Run every case the PR added, valid and invalid, before pushing a source change** (loop over the new keys
+  of the provider diff with both `testValidCode@` and `testInvalidCode@`; a missing kind prints "No tests"):
+  a fix for one comment turned an invalid case of the same PR into a pass, and only CI said so. If the
+  case encoded what the maintainer now objects to, move it to the other provider and say so in the comment.
+- **Never `pgrep -f <name>` inside a command whose own line contains the name:** it matches the shell and a
+  "wait until it finishes" loop never ends. Check with `ps aux | grep "[n]ame"`.
+- **A moving master re-conflicts PRs between pushes:** after a push check `gh pr view <n> --json
+  mergeable` once more (an AppVeyor "unable to build non-mergeable pull request" is the same signal).
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
