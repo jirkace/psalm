@@ -442,6 +442,16 @@ test for each item that applies:
   "wait until it finishes" loop never ends. Check with `ps aux | grep "[n]ame"`.
 - **A moving master re-conflicts PRs between pushes:** after a push check `gh pr view <n> --json
   mergeable` once more (an AppVeyor "unable to build non-mergeable pull request" is the same signal).
+- **`--filter 'testValidCode@name$'` runs nothing** (the data-set name is not at the end of the id; AGENTS.md says
+  so): a loop that treats "No tests executed" as skip checked nothing for a whole batch. Use `@name` without `$`,
+  and make a verification script report a case that ran neither kind as a problem (`NOT RUN`), not skip it. A
+  prefix of another name only runs more cases.
+- **A PR whose fix master now has is closed with evidence, found by the conflict:** when both sides change the
+  same lines of an analyzer (`$record_alternatives` vs `$impossible_alternatives`, a `documenting` docblock fix),
+  read what master's commit says and run the PR's own cases against master's source (copy the PR's test file over
+  `origin/master` in a scratch worktree); if they pass, comment and close instead of merging.
+- **Separate PRs that a maintainer asks for are created by the user:** the classifier refuses `gh pr create`
+  from this session; commit and push the branch to the fork, tell the maintainer where it is, and ask the user.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
