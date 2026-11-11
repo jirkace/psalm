@@ -404,6 +404,36 @@ test for each item that applies:
   `PreloaderList.php`, and the tests; `DocumentationTest` runs the docs page.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
+- **A perf-report regression is reproduced from the project's own code, then reduced:** the sources of
+  Symfony, Drupal and PHPUnit are under `~/psalm-work/*-src` or `vendor/`; cut the quoted lines down
+  to a scratch file and run it on master and on the branch. Trace the types (`@psalm-trace`) at each
+  step: the cause was twice a *new key* (`static::NAME`, an assertion on a `??=` variable) that the
+  reconciler could not resolve and turned into `mixed`, or an assertion applied to the type from
+  before an assignment.
+- **A flag set on a whole union needs a test with a second alternative in it** (`A<T>|B`): `had_template`
+  on the union skipped the invariance check for `B` as well. Likewise a narrowing copied into a
+  closure (`$obj->prop`) must be limited to what cannot change (a readonly property, one level deep):
+  test a nested path and a mutable property.
+- **Look at the sibling places of an index mistake:** an offset counted in argument expressions instead
+  of consumed parameters also gave the wrong argument number in the message, and a loop over the
+  parameters skipped every argument past a variadic one (iterate over the arguments, not the
+  parameters). A helper that lists mixins "for last-match-wins" needs reversing for a first-match loop.
+- **Before calling something a regression or a guard, run the case on master:** the matching-union
+  argument was rejected by master as well, so it was neither; say so in the comment instead of adding
+  a case that only pins the limitation.
+- **A "known limit" case of master turns invalid when the PR fixes the limit:** move it to the valid
+  provider (renamed without `KnownLimit`) in the same PR; CI fails on it otherwise.
+- **The fix may already be on the branch:** a parallel session pushed it after the comment (compare the
+  commit time with the comment time, `git log -3 <fork branch>`); verify its cases and the merge with
+  master, then comment instead of redoing it.
+- **Resolving provider conflicts:** `hunkres.py`-style "keep both" lost an entry's header when git
+  factored out shared lines. Reliable: take master's file (`git checkout --ours` during a rebase,
+  `--theirs` during a merge of master into the branch) and re-insert the PR's added entries or methods
+  from `git show <commit>`, then compare the key sets of both parents with the result. A method
+  inserted between a docblock and its `#[Override]` takes over the docblock (`@psalm-pure`).
+- **Never `git commit --amend` or chain commands after a heredoc on a new line:** the first is refused by
+  the classifier and breaks the standing rule; the second ran `git push` and a comment after a failed
+  gate. One `&&` chain from the gate to the comment.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
