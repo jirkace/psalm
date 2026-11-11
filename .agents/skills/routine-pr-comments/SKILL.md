@@ -360,6 +360,21 @@ test for each item that applies:
 - **Probe docblocks one tag per line**, as in tests: `/** @param T $s @return T */` silently
   drops the second tag and makes the probe pass on master for the wrong reason. Put the
   scratch classes of unrelated cases in separate files or projects (`DuplicateClass`).
+- **Look for an existing flag before adding a state to the scope.** A property marked
+  `possibly_undefined` leaked into every consumer of `vars_in_scope` (array append, `.=`);
+  `Union::ignore_isset` already meant "isset on this is a real question" and is only read by the
+  isset reconcilers. A marker that has to be cleared by each reader is the wrong marker.
+- **A fix that drops information must be checked against the idioms the dropped part serves.**
+  `A || ($v = f())`: the positive clause is sound as it is (where `A` is the true disjunct the right
+  side never ran); only the negation mixes a claim about the old value with one about the new one,
+  and the else/ternary context starts from the union of both. Before filtering clauses, probe the
+  common idioms (`$s === null || ($s = trim($s)) === ''` in `if`/`else`, in a ternary, `&&` chains)
+  and the precision of the true branch, in a probe project against master.
+- **When no local fix keeps both, say so and ask for the direction** (narrow the PR, or fix where
+  the contexts are built) instead of pushing a version that regresses the idiom.
+- **Repro snippets with a reviewer's exact shapes:** a `final` class or `#[Override]` the snippet
+  lacks changes the issues (`ClassMustBeFinal`, `MissingOverrideAttribute`); filter them out of the
+  probe output rather than editing the snippet.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
