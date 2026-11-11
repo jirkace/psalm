@@ -11,8 +11,13 @@ Work in the main session, no subagents (see AGENTS.md).
 
 ## 1. List PRs with a conflict
 
+**List limit:** the user has 300+ open PRs and `gh pr list` silently stops at `--limit`
+(a run with `--limit 200` handled 200 of 323). Use `--limit 500` and compare the number of rows
+with `gh api 'search/issues?q=repo:vimeo/psalm+is:pr+is:open+author:jirkace&per_page=1' --jq .total_count`;
+if they differ, raise the limit before acting. Say the total in the report.
+
 ```bash
-gh pr list --repo vimeo/psalm --author @me --state open --limit 100 \
+gh pr list --repo vimeo/psalm --author @me --state open --limit 500 \
   --json number,title,headRefName,headRefOid,mergeable,mergeStateStatus,isDraft,isCrossRepository
 ```
 
@@ -84,6 +89,16 @@ The user's standing instruction: whenever a maintainer asks for a rebase, always
 force-push (with the lease) and comment as in step 6, without asking again.
 
 Force-pushing is allowed only here, only to the user's fork branch, only with the lease.
+
+## 2c. Merging master into many PRs at once (clean merges only)
+
+When a master fix has to reach many PRs (a baseline repair, say), skip worktrees: test with
+`git merge-tree --write-tree origin/master <head>` (exit 0 = clean, otherwise leave the PR for
+step 2), build the merge with `git commit-tree <tree> -p <head> -p origin/master -m "Merge master
+into <branch>" ` (trailer `Co-Authored-By` only) and push it as a plain fast-forward
+`git push git_origin_jirkace <sha>:refs/heads/<branch>`. Skip PRs whose head already contains the
+fix (`git merge-base --is-ancestor <fix> <head>`). The pushes are slow (one per branch): run the
+script in the background and start the CI watch only after it has finished.
 
 ## 3. Verify and report
 

@@ -10,8 +10,13 @@ PRs (author `jirkace`). Work in the main session, no subagents.
 
 ## 1. Collect unresolved feedback
 
+**List limit:** the user has 300+ open PRs and `gh pr list` silently stops at `--limit`
+(a run with `--limit 200` handled 200 of 323). Use `--limit 500` and compare the number of rows
+with `gh api 'search/issues?q=repo:vimeo/psalm+is:pr+is:open+author:jirkace&per_page=1' --jq .total_count`;
+if they differ, raise the limit before acting. Say the total in the report.
+
 ```bash
-gh pr list --repo vimeo/psalm --author @me --state open --limit 100 --json number,title,headRefOid
+gh pr list --repo vimeo/psalm --author @me --state open --limit 500 --json number,title,headRefOid
 ```
 
 For each PR, review threads (resolved state is only available via GraphQL):
