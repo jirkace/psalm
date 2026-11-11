@@ -335,6 +335,26 @@ test for each item that applies:
      original snippets on master with the strict config of `psalm-contribute` section 7d and post
      the "no longer reproduces" comment with commit, PHP version, config and real output; never
      close the issue, and never write a reason that was not seen in the output.
+- **A flag on a shared storage cannot hold per-class state.** A trait method's `MethodStorage`
+  is one object for every class using the trait, so "this method inherits the parent's docblock"
+  (or anything else that depends on the using class) belongs on the *class* storage
+  (`documenting_method_ids`), filled in the `Populator` for the methods the class takes from the
+  trait, and read through the called class. A comparator guard that special-cases `is_trait` is
+  the symptom-level version of this and hides real errors (a `: int` implementation, two
+  interfaces documenting one method).
+- **Ground truth for a behaviour is the same code written in the class.** For each case a
+  reviewer lists, write the in-class equivalent in the probe project and run it on master; the
+  fix is right when the new variant matches it, including where it reports nothing. Do not assume
+  the old (shared) variant's issue was correct.
+- **A review's "third copy" is part of the fix:** when the extracted helper has a sibling copy
+  elsewhere (`CallAnalyzer` next to `AssertionFinder`), make the helper public and delete the
+  copy, then fix a bug the dedupe exposes (`str_replace` of the index replacing every copy of
+  it) in the one place, with a case for each entry point. Change the helper's parameters so every
+  caller fits (`$args` instead of `$expr->getArgs()`), and let it explode the id itself rather
+  than take four values derived from one string.
+- **Probe docblocks one tag per line**, as in tests: `/** @param T $s @return T */` silently
+  drops the second tag and makes the probe pass on master for the wrong reason. Put the
+  scratch classes of unrelated cases in separate files or projects (`DuplicateClass`).
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
