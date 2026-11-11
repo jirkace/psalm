@@ -375,6 +375,33 @@ test for each item that applies:
 - **Repro snippets with a reviewer's exact shapes:** a `final` class or `#[Override]` the snippet
   lacks changes the issues (`ClassMustBeFinal`, `MissingOverrideAttribute`); filter them out of the
   probe output rather than editing the snippet.
+- **A merge that is textually clean is not a merge that works.** Merging master into 180 PRs
+  with `merge-tree` + `commit-tree` produced a dropped `use` (master removed an unused import, the
+  PR used it), duplicate issue shortcodes (two PRs and master all took 374), a stale expectation
+  (master changed how a type prints) and cases of master that the PR's change breaks. CI of the
+  merged heads is the check: sweep it with `gh pr checks <n> --json name,bucket` over all PRs in
+  parallel, group the failures by check name, and fix each in the PR's own worktree, resetting it
+  to the fork head first (`git fetch`; another session may have pushed the same fix: compare
+  `git log -3 <fork branch>` before editing, and merge the remote before pushing). Never work in
+  the main checkout either: another session switched it to master under this one.
+- **Gate every push on self-analysis with `&&`**, not `;`: `... | grep "No errors found" && git
+  push`. A `;` pushed a `MissingPureAnnotation` once, and the comment said "clean".
+- **`ComplexMethod` after a merge:** read the size before and after: temporarily set
+  `max_graph_size = 100` in `Config.php` of a scratch worktree and run `./psalm <file>`; the
+  message prints the size (master 198 vs PR 201). Fewer local variables and one-expression checks
+  cut it; an extracted helper that returns a value or takes three arguments can add to it.
+- **When master's own cases fail on the PR, the PR changed what they pin:** run the failing case on
+  master, then find which part of the PR it needs (a fresh `TemplateResult` that lost
+  `static_class_type`, a closure parameter expanded with `static` as well as `self`, a check the
+  case's `@psalm-suppress` relied on). Do not edit the master case unless the change is an
+  improvement (a suppression that became unused).
+- **Rebase a maintainer asked for:** the conflicts are in the provider arrays; when two commits of
+  the PR touch the same entry take the later commit's version of it, then check that every case
+  name of the old head still exists (one was lost) and push with
+  `--force-with-lease=<branch>:<old sha>`.
+- **A new issue type touches seven places:** the class (`SHORTCODE` unique against master and the
+  other open PRs), `config.xsd`, `docs/running_psalm/issues.md`, `error_levels.md`, its docs page,
+  `PreloaderList.php`, and the tests; `DocumentationTest` runs the docs page.
 - **Watching CI:** a background script that polls `gh pr checks` for the open PRs and exits
   when nothing is pending (notified on exit) saves foreground waiting.
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
