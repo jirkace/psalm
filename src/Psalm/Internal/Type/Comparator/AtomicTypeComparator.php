@@ -10,6 +10,7 @@ use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Storage\Capabilities;
+use Psalm\Type;
 use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\Scalar;
 use Psalm\Type\Atomic\TArray;
@@ -27,6 +28,7 @@ use Psalm\Type\Atomic\TIntersection;
 use Psalm\Type\Atomic\TIterable;
 use Psalm\Type\Atomic\TKeyOf;
 use Psalm\Type\Atomic\TKeyedArray;
+use Psalm\Type\Atomic\TLiteralInt;
 use Psalm\Type\Atomic\TLiteralString;
 use Psalm\Type\Atomic\TMixed;
 use Psalm\Type\Atomic\TNamedObject;
@@ -52,6 +54,8 @@ use function array_merge;
 use function array_values;
 use function assert;
 use function count;
+use function is_int;
+use function min;
 use function reset;
 use function strtolower;
 
@@ -1127,42 +1131,104 @@ final class AtomicTypeComparator
             && $second_comparison_result->type_coerced
         ) || ($type1_part instanceof TKeyedArray
             && $type2_part instanceof TKeyedArray
-            && self::keyedArraysCanBeIdentical($codebase, $type1_part, $type2_part)
+            && self::canKeyedArraysBeIdentical($codebase, $type1_part, $type2_part)
         );
     }
 
     /**
-     * Two shapes can hold the same array if every key required by one is there in the other with a value that can be
-     * the same, the optional ones being absent from both otherwise
+     * Whether some array could have the shape of both: each key that one of them requires is allowed by the other
+     * (as a key it declares, or by its fallback), and the values of such a key can be identical.
      */
-    private static function keyedArraysCanBeIdentical(
-        Codebase $codebase,
-        TKeyedArray $first,
-        TKeyedArray $second,
-    ): bool {
-        foreach ($first->properties + $second->properties as $key => $_) {
-            $first_property = $first->properties[$key] ?? null;
-            $second_property = $second->properties[$key] ?? null;
+    private static function canKeyedArraysBeIdentical(Codebase $codebase, TKeyedArray $first, TKeyedArray $second): bool
+    {
+        return self::keyedArrayRequirementsFit($codebase, $first, $second)
+            && self::keyedArrayRequirementsFit($codebase, $second, $first)
+            && self::listCanHaveTheRequiredKeysOf($codebase, $first, $second)
+            && self::listCanHaveTheRequiredKeysOf($codebase, $second, $first);
+    }
 
-            if ($first_property !== null && $second_property !== null) {
-                if (!($first_property->possibly_undefined && $second_property->possibly_undefined)
-                    && !UnionTypeComparator::canExpressionTypesBeIdentical($codebase, $first_property, $second_property)
-                ) {
+    /**
+     * A list has every key below the highest it has, so it can only be identical to a shape that allows all the
+     * keys below the highest int key the shape requires (`array{0: int, 2: int}` is not a list).
+     */
+    private static function listCanHaveTheRequiredKeysOf(
+        Codebase $codebase,
+        TKeyedArray $list,
+        TKeyedArray $other,
+    ): bool {
+        if (!$list->is_list) {
+            return true;
+        }
+
+        $highest_required_key = null;
+
+        foreach ($other->properties as $key => $property) {
+            if (!$property->possibly_undefined && is_int($key) && ($highest_required_key ?? $key) <= $key) {
+                $highest_required_key = $key;
+            }
+        }
+
+        // far-fetched keys are not worth checking one by one
+        for ($key = 0; $key < min($highest_required_key ?? 0, 256); $key++) {
+            // the list has the item, and so must the other one: of a type both can have
+            $list_item = $list->properties[$key] ?? $list->fallback_params[1] ?? null;
+
+            if (isset($other->properties[$key])) {
+                $other_item = $other->properties[$key];
+            } elseif ($other->fallback_params !== null
+                && UnionTypeComparator::canExpressionTypesBeIdentical(
+                    $codebase,
+                    new Union([new TLiteralInt($key)]),
+                    $other->fallback_params[0],
+                )
+            ) {
+                $other_item = $other->fallback_params[1];
+            } else {
+                return false;
+            }
+
+            if ($list_item !== null
+                && !UnionTypeComparator::canExpressionTypesBeIdentical($codebase, $list_item, $other_item)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function keyedArrayRequirementsFit(
+        Codebase $codebase,
+        TKeyedArray $required,
+        TKeyedArray $other,
+    ): bool {
+        foreach ($required->properties as $key => $property) {
+            if ($property->possibly_undefined) {
+                continue;
+            }
+
+            if (isset($other->properties[$key])) {
+                if (!UnionTypeComparator::canExpressionTypesBeIdentical(
+                    $codebase,
+                    $property,
+                    $other->properties[$key],
+                )) {
                     return false;
                 }
 
                 continue;
             }
 
-            $property = $first_property ?? $second_property;
-            $other = $first_property !== null ? $second : $first;
-
-            if ($property === null || $property->possibly_undefined) {
-                continue;
+            if ($other->fallback_params === null) {
+                return false;
             }
 
-            if ($other->fallback_params === null
-                || !UnionTypeComparator::canExpressionTypesBeIdentical($codebase, $property, $other->fallback_params[1])
+            $key_type = new Union([is_int($key) ? new TLiteralInt($key) : Type::getAtomicStringFromLiteral($key)]);
+
+            [$fallback_key_type, $fallback_value_type] = $other->fallback_params;
+
+            if (!UnionTypeComparator::canExpressionTypesBeIdentical($codebase, $key_type, $fallback_key_type)
+                || !UnionTypeComparator::canExpressionTypesBeIdentical($codebase, $property, $fallback_value_type)
             ) {
                 return false;
             }

@@ -154,6 +154,26 @@ final class ConditionalTest extends TestCase
     public static function providerValidCodeParse(): iterable
     {
         return [
+            'identicalKeyedArraysWithAnOptionalKeyOfOverlappingTypes' => [
+                'code' => '<?php
+                    /** @param array{a?: int|string} $x */
+                    function f(array $x, string|bool $s): bool {
+                        return $x === ["a" => $s];
+                    }',
+                'assertions' => [],
+                'ignored_issues' => [],
+                'php_version' => '8.0',
+            ],
+            'identicalKeyedArraysWithAFallbackOfOverlappingTypes' => [
+                'code' => '<?php
+                    /** @param array{a: int|string, ...<string, mixed>} $x */
+                    function f(array $x, string|bool $s): bool {
+                        return $x === ["a" => $s];
+                    }',
+                'assertions' => [],
+                'ignored_issues' => [],
+                'php_version' => '8.0',
+            ],
             'mixedStaysMixedAfterAStackedTernaryOnItsType' => [
                 'code' => '<?php
                     /** @var mixed $a */
@@ -4396,26 +4416,6 @@ final class ConditionalTest extends TestCase
                             return "Not Zero";
                         }
                     }',
-            ],
-            'identicalKeyedArraysWithAnOptionalKeyOfOverlappingTypes' => [
-                'code' => '<?php
-                    /** @param array{a?: int|string} $x */
-                    function f(array $x, string|bool $s): bool {
-                        return $x === ["a" => $s];
-                    }',
-                'assertions' => [],
-                'ignored_issues' => [],
-                'php_version' => '8.0',
-            ],
-            'identicalKeyedArraysWithAFallbackOfOverlappingTypes' => [
-                'code' => '<?php
-                    /** @param array{a: int|string, ...<string, mixed>} $x */
-                    function f(array $x, string|bool $s): bool {
-                        return $x === ["a" => $s];
-                    }',
-                'assertions' => [],
-                'ignored_issues' => [],
-                'php_version' => '8.0',
             ],
             'sideEffectInTheOrConditionRunsOnceInTheElse' => [
                 'code' => '<?php
