@@ -452,6 +452,46 @@ test for each item that applies:
   `origin/master` in a scratch worktree); if they pass, comment and close instead of merging.
 - **Separate PRs that a maintainer asks for are created by the user:** the classifier refuses `gh pr create`
   from this session; commit and push the branch to the fork, tell the maintainer where it is, and ask the user.
+- **When the same exemption draws a second remark, drop it and change what is reported.** Name-based and
+  AST-based exemptions (`floor()`, `round()`, `octdec()` of an `ImplicitFloatToIntCast`, #12623) each left the
+  next false positive in the perf report and wrong hits for user functions of the same name. Report only what
+  is *definitely* wrong (a literal with a fraction), not what might be (a `float` of unknown value).
+- **Put the logic in the narrowest predicate that owns the question.** "Can these two be identical" belongs in
+  `canBeIdentical()`, not in general containment (`ScalarTypeComparator`), which changes overload resolution and
+  coercion for everything else. Honour the bound of the type: `class-string<callable-object>` is not `'stdClass'`
+  (`TUnknownClassString::as_unknown_type`, `TDependentGetClass::as_type`, #12949).
+- **Resolve names and constants with the codebase, never with `defined()`/`constant()` of Psalm's own runtime**
+  (`namespace Foo; const E_ERROR = 4;` resolved to the global 1, #13200). Grep for an existing deferred atomic
+  first (`TGlobalConstant` with `fallback_const_name` already did the namespace fallback). A reference that stays
+  unresolved has to stay in the expanded type and in the visitor (`getChildNodeKeys()`), or the checker never
+  reports it (`TypeExpander` turned the int-mask into plain `int`).
+- **State restored in one construct has to be restored in its siblings:** after `if`, check the ternary (also
+  `match (true)`), `||`/`&&`/`??` and nested `if`s. Scope what is restored to what the *current* condition added
+  (snapshot before, diff after): promoting the whole set re-enabled the classes of an enclosing negated condition
+  in an unrelated nested `if` (#13293, `Context::promoteNegatedPhantomClasses()`).
+- **Reviewing a perf-report diagnostic:** fetch the project file as of the report (`gh api
+  'repos/<o>/<r>/commits?path=<file>&until=<date>'`, then raw at that sha; `main` has moved), reduce it, and run
+  the non-recursive or unchanged analogue on master. If master reports it too, say it is an existing rule or a
+  trade-off with that evidence (#13077 Symfony/Tempest, #13350 `DateTimeImmutable`); if a type is lost, that is
+  the bug and the reduction usually finds it (`$this` in a closure of a templated class lost the class
+  templates, also on master, #13077).
+- **After merging master, the PR's own cases can fail through an overlapping master change** (#13258: master's
+  nullsafe expansion): run them, find where the PR's logic no longer takes effect, and adapt it. State read after
+  an analysis can already be overwritten by it, so read it before (`NullsafeAnalyzer`); when master is now more
+  precise (`NullArgument` instead of `PossiblyNullArgument`), change the expectation and say why.
+- **A maintainer's patch is applied with `git am` (author kept)**; run its test, and apply the PR description
+  they suggest after checking the example on master and on the branch (#12842).
+- **Before every push `git fetch` the fork branch and gate on `git merge-base --is-ancestor FETCH_HEAD HEAD`:**
+  a parallel session (`blackie`, "Merge master into ...") had pushed in between. Merge the remote tip and keep
+  your side of a conflict that is the feature itself (#13200).
+- **"Keep both" provider conflicts:** when a hunk ends mid-entry git has factored the shared tail out, so the
+  result is `head + tail + master + tail`. A verifier that compares the 12-space entries of both parents flags
+  deliberate removals of the PR (a case moved to the other provider); check those by hand instead of "fixing" them.
+- **Never run a whole test file to check a docs page or a neighbour** (`DocumentationTest` was refused by the
+  classifier): `--filter` with the issue name, or the single case.
+- **Asked "is this an unavoidable trade-off?":** answer with the same behaviour of the sibling that exists today,
+  the opt-out (`ignoreInternalFunctionFalseReturn`), and what a precise treatment would be (a separate feature).
+  Keep a test of the untouched path (a call-map method) next to the changed one (#13350).
 - **Reply format:** English; what was fixed and why, a "**Behaviour change**" list of exactly
   the verified effects, tests named, and what was *not* run. `@mention` after the push.
 
