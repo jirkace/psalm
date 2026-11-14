@@ -2179,6 +2179,29 @@ final class MagicMethodAnnotationTest extends TestCase
                     (new Many())->pick(1.5);',
                 'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:12:40',
             ],
+            'methodParamOfAShapeIsEnforced' => [
+                'code' => <<<'PHP'
+                    <?php
+                    /**
+                     * @method static foo(array{k: 1|2|3|4, l?: string} $x)
+                     */
+                    final class Foo
+                    {
+                        public function __call(string $name, array $arguments): static
+                        {
+                            return $this;
+                        }
+                    }
+
+                    function test(Foo $foo): void
+                    {
+                        $foo->foo(['k' => 9]);
+                    }
+                    PHP,
+                'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:15:15',
+                'error_levels' => [],
+                'php_version' => '8.1',
+            ],
             'methodParamOfAListOfFourLiteralStringsIsEnforced' => [
                 'code' => <<<'PHP'
                     <?php
