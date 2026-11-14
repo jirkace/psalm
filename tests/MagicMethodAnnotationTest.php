@@ -2179,6 +2179,75 @@ final class MagicMethodAnnotationTest extends TestCase
                     (new Many())->pick(1.5);',
                 'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:12:40',
             ],
+            'methodParamOfAListOfFourLiteralStringsIsEnforced' => [
+                'code' => <<<'PHP'
+                    <?php
+                    /**
+                     * @method static foo(list<'a'|'b'|'c'|'d'> $x)
+                     */
+                    final class Foo
+                    {
+                        public function __call(string $name, array $arguments): static
+                        {
+                            return $this;
+                        }
+                    }
+
+                    function test(Foo $foo): void
+                    {
+                        $foo->foo(['bogus']);
+                    }
+                    PHP,
+                'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:15:15',
+                'error_levels' => [],
+                'php_version' => '8.1',
+            ],
+            'methodParamOfANestedGenericOfFourLiteralIntsIsEnforced' => [
+                'code' => <<<'PHP'
+                    <?php
+                    /**
+                     * @method static foo(array<string, array<int, 1|2|3|4>> $x)
+                     */
+                    final class Foo
+                    {
+                        public function __call(string $name, array $arguments): static
+                        {
+                            return $this;
+                        }
+                    }
+
+                    function test(Foo $foo): void
+                    {
+                        $foo->foo(['k' => [9]]);
+                    }
+                    PHP,
+                'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:15:15',
+                'error_levels' => [],
+                'php_version' => '8.1',
+            ],
+            'methodParamOfANullableFourLiteralStringsInAGenericIsEnforced' => [
+                'code' => <<<'PHP'
+                    <?php
+                    /**
+                     * @method static foo(array<int, 'a'|'b'|'c'|'d'|null> $x)
+                     */
+                    final class Foo
+                    {
+                        public function __call(string $name, array $arguments): static
+                        {
+                            return $this;
+                        }
+                    }
+
+                    function test(Foo $foo): void
+                    {
+                        $foo->foo([1 => 'bogus']);
+                    }
+                    PHP,
+                'error_message' => 'InvalidArgument - src' . DIRECTORY_SEPARATOR . 'somefile.php:15:15',
+                'error_levels' => [],
+                'php_version' => '8.1',
+            ],
             'methodParamOfFourLiteralStringsIsEnforced' => [
                 'code' => <<<'PHP'
                     <?php

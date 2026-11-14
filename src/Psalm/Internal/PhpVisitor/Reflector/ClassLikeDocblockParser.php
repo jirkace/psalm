@@ -25,15 +25,19 @@ use Psalm\Internal\Type\ParseTree\MethodWithReturnTypeTree;
 use Psalm\Internal\Type\ParseTreeCreator;
 use Psalm\Internal\Type\TypeParser;
 use Psalm\Internal\Type\TypeTokenizer;
+use Psalm\Internal\TypeVisitor\LongLiteralUnionReplacer;
 use Psalm\Storage\Capabilities;
 use Psalm\Storage\CapabilitiesParseException;
+use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\TCapabilities;
+use Psalm\Type\TypeNode;
 use Psalm\Type\Union;
 
 use function array_column;
 use function array_fill_keys;
 use function array_key_first;
 use function array_shift;
+use function assert;
 use function count;
 use function explode;
 use function implode;
@@ -484,14 +488,8 @@ final class ClassLikeDocblockParser
                             );
                         }
 
-                        $docblock_lines[] = '@return ' . ($return_type instanceof Union
-                            ? $return_type->toNamespacedStringWithAllLiterals(
-                                $aliases->namespace,
-                                $aliases->uses,
-                                null,
-                                false,
-                            )
-                            : $return_type->toNamespacedString($aliases->namespace, $aliases->uses, null, false));
+                        $docblock_lines[] = '@return '
+                            . self::printTypeKeepingLiterals($return_type, $aliases->namespace, $aliases->uses);
                     }
 
                     $method_tree = $method_tree->children[0];
@@ -528,9 +526,7 @@ final class ClassLikeDocblockParser
                             );
                         }
 
-                        $param_type_string = $param_type instanceof Union
-                            ? $param_type->toNamespacedStringWithAllLiterals('\\', [], null, false)
-                            : $param_type->toNamespacedString('\\', [], null, false);
+                        $param_type_string = self::printTypeKeepingLiterals($param_type, '\\', []);
                         $docblock_lines[] = '@param ' . $param_type_string . ' '
                             . ($method_tree_child->variadic ? '...' : '')
                             . $method_tree_child->name;
@@ -623,6 +619,24 @@ final class ClassLikeDocblockParser
         self::addMagicPropertyToInfo($comment, $info, $parsed_docblock->tags, 'psalm-property-write');
 
         return $info;
+    }
+
+    /**
+     * Prints a type so that it parses back to the same type: the literals of a union are all kept, however many
+     *
+     * @param array<lowercase-string, string> $aliased_classes
+     */
+    private static function printTypeKeepingLiterals(
+        TypeNode $type,
+        ?string $namespace,
+        array $aliased_classes,
+    ): string {
+        $replacer = new LongLiteralUnionReplacer($namespace, $aliased_classes);
+        $replacer->traverse($type);
+
+        assert($type instanceof Union || $type instanceof Atomic);
+
+        return $replacer->restore($type->toNamespacedString($namespace, $aliased_classes, null, false));
     }
 
     /**
