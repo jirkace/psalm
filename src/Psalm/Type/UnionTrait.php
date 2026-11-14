@@ -1544,12 +1544,7 @@ trait UnionTrait
             $context,
         );
 
-        $checker->traverseArray($this->types);
-
-        /** @psalm-suppress InaccessibleProperty, ImpurePropertyAssignment Does not affect anything else */
-        $this->checked = true;
-
-        return !$checker->hasErrors();
+        return $checker->check($this);
     }
 
     /**
