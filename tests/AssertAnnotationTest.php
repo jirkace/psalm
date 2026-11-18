@@ -344,6 +344,44 @@ final class AssertAnnotationTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
+            'assertIfTrueOfAFunctionReturningZeroOrFalseHoldsWhereItIsNotFalse' => [
+                'code' => <<<'PHP'
+                    <?php
+                    /**
+                     * @psalm-assert-if-true non-empty-string $s
+                     * @return int<0, max>|false
+                     */
+                    function find(string $s) {
+                        return strpos($s, 'x');
+                    }
+
+                    final class Finder {
+                        /**
+                         * @psalm-assert-if-true non-empty-string $s
+                         * @return int<0, max>|false
+                         */
+                        public function find(string $s) {
+                            return strpos($s, 'x');
+                        }
+                    }
+
+                    function f(string $a, string $b, string $c, Finder $finder): void {
+                        if (find($a) !== false) {
+                            /** @psalm-check-type-exact $a = non-empty-string */
+                        }
+
+                        if (find($b) === false) {
+                            return;
+                        }
+
+                        /** @psalm-check-type-exact $b = non-empty-string */
+
+                        if ($finder->find($c) !== false) {
+                            /** @psalm-check-type-exact $c = non-empty-string */
+                        }
+                    }
+                    PHP,
+            ],
             'assertionOnAStringParameterOfABuiltinKeepsAnObjectArgument' => [
                 'code' => <<<'PHP'
                     <?php

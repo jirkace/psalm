@@ -2376,8 +2376,13 @@ final class AssertionFinder
             }
 
             $if_types = [[$var_name => [[self::withPolarity($assertion, $negated)]]]];
-        } elseif (!$value && $strict && self::canBeFalsyButNotFalse($base_conditional, $source)) {
-            // `preg_match() !== false` is also true when it found no match, and `=== false` false
+        } elseif (!$value
+            && $strict
+            && self::canBeFalsyButNotFalse($base_conditional, $source)
+            && !self::hasIfTrueAssertions($base_conditional, $source)
+        ) {
+            // `preg_match() !== false` is also true when it found no match, and `=== false` false. The declared
+            // `@psalm-assert-if-true` of a call holds where it isn't false (`strpos() !== false`).
             $if_types = [];
         } else {
             if ($base_conditional instanceof PhpParser\Node\Expr\FuncCall
@@ -3116,6 +3121,21 @@ final class AssertionFinder
         }
 
         return false;
+    }
+
+    /**
+     * Whether $expr is a call with a declared `@psalm-assert-if-true`
+     *
+     * @psalm-capabilities read-props
+     */
+    private static function hasIfTrueAssertions(PhpParser\Node\Expr $expr, FileSource $source): bool
+    {
+        return $source instanceof StatementsAnalyzer
+            && ($expr instanceof PhpParser\Node\Expr\FuncCall
+                || $expr instanceof PhpParser\Node\Expr\MethodCall
+                || $expr instanceof PhpParser\Node\Expr\StaticCall
+                || $expr instanceof PhpParser\Node\Expr\New_)
+            && ($source->node_data->getIfTrueAssertions($expr) ?? []) !== [];
     }
 
     /**
