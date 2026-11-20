@@ -754,35 +754,12 @@ final class ExistingAtomicStaticCallAnalyzer
                 : ($static_type instanceof TNamedObject ? $static_type->value : null);
 
             if ($called_class !== null && $self_fq_class_name !== null) {
-                $called_params = $static_type instanceof TGenericObject
-                    ? $static_type->type_params
-                    : ($lhs_type_part instanceof TGenericObject
-                        && strtolower($lhs_type_part->value) === strtolower($called_class)
-                            ? $lhs_type_part->type_params
-                            : null);
-
-                // a class named in the call is used without arguments: its templates are their bounds
-                if ($called_params === null
-                    && $stmt->class instanceof PhpParser\Node\Name
-                    && !in_array(strtolower($stmt->class->toString()), ['self', 'static', 'parent'], true)
-                ) {
-                    $called_params = [];
-
-                    foreach ($class_storage->template_types ?? [] as $type_map) {
-                        $bound = reset($type_map);
-
-                        if (!Capabilities::isPurityType($bound)) {
-                            $called_params[] = $bound;
-                        }
-                    }
-                }
-
                 $return_type_candidate = StaticArgumentsProjector::projectType(
                     $codebase,
                     $return_type_candidate,
                     StaticArgumentsProjector::getDeclaringClass($codebase, $method_id, $self_fq_class_name),
                     $called_class,
-                    $called_params,
+                    self::getCalledClassArguments($stmt, $lhs_type_part, $static_type, $called_class, $class_storage),
                 );
 
                 // the arguments of `static<...>` have no template to go to in a class that has none
@@ -845,6 +822,50 @@ final class ExistingAtomicStaticCallAnalyzer
         }
 
         return $return_type_candidate;
+    }
+
+    /**
+     * The arguments the class a static call is made on is used with: those of its type, else its templates' bounds
+     * for a class named in the call
+     *
+     * @return list<Union>|null
+     * @psalm-capabilities read-props
+     */
+    private static function getCalledClassArguments(
+        StaticCall $stmt,
+        Atomic $lhs_type_part,
+        string|TNamedObject|TTemplateParam|null $static_type,
+        string $called_class,
+        ClassLikeStorage $class_storage,
+    ): ?array {
+        if ($static_type instanceof TGenericObject) {
+            return $static_type->type_params;
+        }
+
+        if ($lhs_type_part instanceof TGenericObject
+            && strtolower($lhs_type_part->value) === strtolower($called_class)
+        ) {
+            return $lhs_type_part->type_params;
+        }
+
+        if (!$stmt->class instanceof PhpParser\Node\Name
+            || in_array(strtolower($stmt->class->toString()), ['self', 'static', 'parent'], true)
+        ) {
+            return null;
+        }
+
+        // a class named in the call is used without arguments: its templates are their bounds
+        $arguments = [];
+
+        foreach ($class_storage->template_types ?? [] as $type_map) {
+            $bound = reset($type_map);
+
+            if (!Capabilities::isPurityType($bound)) {
+                $arguments[] = $bound;
+            }
+        }
+
+        return $arguments;
     }
 
     /**
