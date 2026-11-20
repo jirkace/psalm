@@ -34,6 +34,7 @@ use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeExpander;
 use Psalm\Internal\Type\TypeVariableTracker;
 use Psalm\Internal\TypeVisitor\ContainsStaticVisitor;
+use Psalm\Internal\TypeVisitor\StaticArgumentsProjector;
 use Psalm\Issue\AbstractMethodCall;
 use Psalm\Issue\ImpureMethodCall;
 use Psalm\Issue\UnusedMethodCall;
@@ -44,16 +45,19 @@ use Psalm\Storage\ClassLikeStorage;
 use Psalm\Storage\Possibilities;
 use Psalm\Type;
 use Psalm\Type\Atomic;
+use Psalm\Type\Atomic\TGenericObject;
 use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Atomic\TTemplateParamClass;
 use Psalm\Type\Union;
 
+use function array_any;
 use function array_map;
 use function count;
 use function explode;
 use function in_array;
 use function is_string;
+use function reset;
 use function str_starts_with;
 use function strlen;
 use function strpos;
@@ -743,6 +747,55 @@ final class ExistingAtomicStaticCallAnalyzer
                     $template_result,
                     $codebase,
                 );
+            }
+
+            $called_class = is_string($static_type)
+                ? $static_type
+                : ($static_type instanceof TNamedObject ? $static_type->value : null);
+
+            if ($called_class !== null && $self_fq_class_name !== null) {
+                $called_params = $static_type instanceof TGenericObject
+                    ? $static_type->type_params
+                    : ($lhs_type_part instanceof TGenericObject
+                        && strtolower($lhs_type_part->value) === strtolower($called_class)
+                            ? $lhs_type_part->type_params
+                            : null);
+
+                // a class named in the call is used without arguments: its templates are their bounds
+                if ($called_params === null
+                    && $stmt->class instanceof PhpParser\Node\Name
+                    && !in_array(strtolower($stmt->class->toString()), ['self', 'static', 'parent'], true)
+                ) {
+                    $called_params = [];
+
+                    foreach ($class_storage->template_types ?? [] as $type_map) {
+                        $bound = reset($type_map);
+
+                        if (!Capabilities::isPurityType($bound)) {
+                            $called_params[] = $bound;
+                        }
+                    }
+                }
+
+                $return_type_candidate = StaticArgumentsProjector::projectType(
+                    $codebase,
+                    $return_type_candidate,
+                    StaticArgumentsProjector::getDeclaringClass($codebase, $method_id, $self_fq_class_name),
+                    $called_class,
+                    $called_params,
+                );
+
+                // the arguments of `static<...>` have no template to go to in a class that has none
+                if (is_string($static_type)
+                    && $class_storage->template_types === null
+                    && array_any(
+                        $return_type_candidate->getAtomicTypes(),
+                        static fn(Atomic $atomic): bool => $atomic instanceof TGenericObject
+                            && strtolower($atomic->value) === 'static',
+                    )
+                ) {
+                    $static_type = new TNamedObject($static_type);
+                }
             }
 
             $return_type_candidate = TypeExpander::expandUnion(

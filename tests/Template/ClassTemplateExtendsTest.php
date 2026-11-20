@@ -2857,6 +2857,101 @@ final class ClassTemplateExtendsTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.0',
             ],
+            'returnStaticArgumentsProjectedOnAStaticCallWithoutArguments' => [
+                'code' => '<?php
+                    /**
+                     * @template TA
+                     * @template TB
+                     */
+                    abstract class Base {
+                        /** @return static<TA, int> */
+                        public static function make(): static {
+                            throw new \Exception();
+                        }
+                    }
+
+                    /**
+                     * @template TZ
+                     * @template TA2
+                     * @template TB2
+                     * @extends Base<TA2, TB2>
+                     */
+                    abstract class Prefixed extends Base {}
+
+                    /** @extends Base<string, bool> */
+                    abstract class Plain extends Base {}
+
+                    $r = Prefixed::make();',
+                'assertions' => [
+                    '$r===' => 'Prefixed<mixed, mixed, int>',
+                ],
+                'ignored_issues' => [],
+                'php_version' => '8.0',
+            ],
+            'returnStaticArgumentsProjectedOnAStaticCallOfAnObject' => [
+                'code' => '<?php
+                    /**
+                     * @template TA
+                     * @template TB
+                     */
+                    abstract class Base {
+                        /** @return static<TA, int> */
+                        public static function make(): static {
+                            throw new \Exception();
+                        }
+                    }
+
+                    /**
+                     * @template TZ
+                     * @template TA2
+                     * @template TB2
+                     * @extends Base<TA2, TB2>
+                     */
+                    abstract class Prefixed extends Base {}
+
+                    /** @extends Base<string, bool> */
+                    abstract class Plain extends Base {}
+
+                    /** @var Prefixed<float, string, bool> $p */
+                    $p = null;
+                    $r = $p::make();',
+                'assertions' => [
+                    '$r===' => 'Prefixed<float, string, int>',
+                ],
+                'ignored_issues' => [],
+                'php_version' => '8.0',
+            ],
+            'returnStaticArgumentsDroppedOnAStaticCallOfAClassWithoutTemplates' => [
+                'code' => '<?php
+                    /**
+                     * @template TA
+                     * @template TB
+                     */
+                    abstract class Base {
+                        /** @return static<TA, int> */
+                        public static function make(): static {
+                            throw new \Exception();
+                        }
+                    }
+
+                    /**
+                     * @template TZ
+                     * @template TA2
+                     * @template TB2
+                     * @extends Base<TA2, TB2>
+                     */
+                    abstract class Prefixed extends Base {}
+
+                    /** @extends Base<string, bool> */
+                    abstract class Plain extends Base {}
+
+                    $r = Plain::make();',
+                'assertions' => [
+                    '$r===' => 'Plain',
+                ],
+                'ignored_issues' => [],
+                'php_version' => '8.0',
+            ],
             'returnStaticArgumentsProjectedFromATraitThroughExtends' => [
                 'code' => '<?php
                     /**
