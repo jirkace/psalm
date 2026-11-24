@@ -9,6 +9,29 @@ Goal: every open PR of the user (author `jirkace`) merges cleanly into `master`,
 rebase a maintainer asked for is done.
 Work in the main session, no subagents (see AGENTS.md).
 
+## 0. Check that master's CI is green first
+
+Merging or rebasing master into a PR makes the PR run master's red checks too: a broken master
+turned ~15 PRs red in one session (a hung/leaking test, a method renamed under a merged PR), and
+each of them then needed another push. Before any merge or rebase of master:
+
+```bash
+gh api "repos/vimeo/psalm/commits/master/check-runs?per_page=100" \
+  --jq '[.check_runs[]|select(.conclusion=="failure")|.name]|join(", ")'
+gh api "repos/vimeo/psalm/commits/master/check-runs?per_page=100" \
+  --jq '[.check_runs[]|select(.status!="completed")]|length'   # runs still pending
+```
+
+- Failures (or runs still pending on the newest master commit): do **not** merge/rebase master
+  into the PRs. Find the cause first (`gh run view <run> --log-failed`; repeat the failing
+  single test case on a clean `origin/master` worktree). If it comes from a PR of the user, fix
+  master through a PR from the fork (skill `pr-description` format) and wait for its merge; if it
+  comes from someone else, report it and leave the PRs alone, or merge only what is needed to
+  resolve a real conflict.
+- A conflict that a maintainer asked to be resolved (step 1b) is the exception: resolve it, but
+  say in the report that master is red and which checks.
+- After master is fixed, merge it into the PRs that went red because of it (step 2c).
+
 ## 1. List PRs with a conflict
 
 **List limit:** the user has 300+ open PRs and `gh pr list` silently stops at `--limit`
@@ -92,7 +115,8 @@ Force-pushing is allowed only here, only to the user's fork branch, only with th
 
 ## 2c. Merging master into many PRs at once (clean merges only)
 
-When a master fix has to reach many PRs (a baseline repair, say), skip worktrees: test with
+When a master fix has to reach many PRs (a baseline repair, say; first confirm with step 0 that
+master itself is green again), skip worktrees: test with
 `git merge-tree --write-tree origin/master <head>` (exit 0 = clean, otherwise leave the PR for
 step 2), build the merge with `git commit-tree <tree> -p <head> -p origin/master -m "Merge master
 into <branch>" ` (trailer `Co-Authored-By` only) and push it as a plain fast-forward
