@@ -157,75 +157,27 @@ final class SwitchCaseAnalyzer
         }
 
         if ($case->cond) {
-            $was_inside_conditional = $case_context->inside_conditional;
-            $case_context->inside_conditional = true;
-
-            if (!self::analyzeCaseCondition(
+            $case_condition = self::analyzeCaseConditionAgainstSwitchCondition(
                 $statements_analyzer,
+                $stmt,
                 $switch_scope,
                 $case->cond,
+                $context,
                 $case_context,
                 $entry_formula,
-            )) {
+                $switch_condition,
+                $fake_switch_condition,
+                $switch_var_id,
+            );
+
+            if ($case_condition === null) {
                 unset($case_scope->parent_context);
                 unset($case_context->case_scope);
 
                 return false;
             }
 
-            $case_context->inside_conditional = $was_inside_conditional;
-
-            $statements_analyzer->node_data = clone $statements_analyzer->node_data;
-
-            $traverser = new PhpParser\NodeTraverser;
-            $traverser->addVisitor(
-                new ConditionCloningVisitor(
-                    $statements_analyzer->node_data,
-                ),
-            );
-
-            /** @var PhpParser\Node\Expr */
-            $switch_condition = $traverser->traverse([$switch_condition])[0];
-
-            if ($fake_switch_condition) {
-                $statements_analyzer->node_data->setType(
-                    $switch_condition,
-                    $switch_var_id === null
-                        ? Type::getMixed()
-                        : ($case_context->vars_in_scope[$switch_var_id] ?? Type::getMixed()),
-                );
-            }
-
-            if ($switch_condition instanceof PhpParser\Node\Expr\Variable
-                && is_string($switch_condition->name)
-                && isset($context->vars_in_scope['$' . $switch_condition->name])
-            ) {
-                $dependent_type_condition = self::getDependentTypeCondition(
-                    $context->vars_in_scope['$' . $switch_condition->name],
-                    $stmt->cond->getAttributes(),
-                );
-
-                if ($dependent_type_condition) {
-                    $switch_condition = $dependent_type_condition;
-
-                    if ($fake_switch_condition) {
-                        $statements_analyzer->node_data->setType(
-                            $switch_condition,
-                            $switch_var_id === null
-                                ? Type::getMixed()
-                                : ($case_context->vars_in_scope[$switch_var_id] ?? Type::getMixed()),
-                        );
-                    }
-                }
-            }
-
-            if ($switch_condition instanceof PhpParser\Node\Expr\ConstFetch
-                && $switch_condition->name->getParts() === ['true']
-            ) {
-                $case_equality_expr = $case->cond;
-            } else {
-                $case_equality_expr = self::getCaseEqualityExpr($statements_analyzer, $switch_condition, $case->cond);
-            }
+            [$switch_condition, $case_equality_expr] = $case_condition;
         }
 
         $continue_case_equality_expr = false;
@@ -508,6 +460,95 @@ final class SwitchCaseAnalyzer
         unset($case_context->case_scope);
 
         return null;
+    }
+
+    /**
+     * Analyzes the condition of a case and builds the comparison of the switch condition with it
+     *
+     * @param list<Clause> $entry_formula
+     * @return array{PhpParser\Node\Expr, ?PhpParser\Node\Expr}|null the switch condition and the comparison, null
+     *     when the analysis failed
+     */
+    private static function analyzeCaseConditionAgainstSwitchCondition(
+        StatementsAnalyzer $statements_analyzer,
+        PhpParser\Node\Stmt\Switch_ $stmt,
+        SwitchScope $switch_scope,
+        PhpParser\Node\Expr $case_cond,
+        Context $context,
+        Context $case_context,
+        array $entry_formula,
+        PhpParser\Node\Expr $switch_condition,
+        bool $fake_switch_condition,
+        ?string $switch_var_id,
+    ): ?array {
+        $was_inside_conditional = $case_context->inside_conditional;
+        $case_context->inside_conditional = true;
+
+        if (!self::analyzeCaseCondition(
+            $statements_analyzer,
+            $switch_scope,
+            $case_cond,
+            $case_context,
+            $entry_formula,
+        )) {
+            return null;
+        }
+
+        $case_context->inside_conditional = $was_inside_conditional;
+
+        $statements_analyzer->node_data = clone $statements_analyzer->node_data;
+
+        $traverser = new PhpParser\NodeTraverser;
+        $traverser->addVisitor(
+            new ConditionCloningVisitor(
+                $statements_analyzer->node_data,
+            ),
+        );
+
+        /** @var PhpParser\Node\Expr */
+        $switch_condition = $traverser->traverse([$switch_condition])[0];
+
+        if ($fake_switch_condition) {
+            $statements_analyzer->node_data->setType(
+                $switch_condition,
+                $switch_var_id === null
+                    ? Type::getMixed()
+                    : ($case_context->vars_in_scope[$switch_var_id] ?? Type::getMixed()),
+            );
+        }
+
+        if ($switch_condition instanceof PhpParser\Node\Expr\Variable
+            && is_string($switch_condition->name)
+            && isset($context->vars_in_scope['$' . $switch_condition->name])
+        ) {
+            $dependent_type_condition = self::getDependentTypeCondition(
+                $context->vars_in_scope['$' . $switch_condition->name],
+                $stmt->cond->getAttributes(),
+            );
+
+            if ($dependent_type_condition) {
+                $switch_condition = $dependent_type_condition;
+
+                if ($fake_switch_condition) {
+                    $statements_analyzer->node_data->setType(
+                        $switch_condition,
+                        $switch_var_id === null
+                            ? Type::getMixed()
+                            : ($case_context->vars_in_scope[$switch_var_id] ?? Type::getMixed()),
+                    );
+                }
+            }
+        }
+
+        if ($switch_condition instanceof PhpParser\Node\Expr\ConstFetch
+            && $switch_condition->name->getParts() === ['true']
+        ) {
+            $case_equality_expr = $case_cond;
+        } else {
+            $case_equality_expr = self::getCaseEqualityExpr($statements_analyzer, $switch_condition, $case_cond);
+        }
+
+        return [$switch_condition, $case_equality_expr];
     }
 
     private static function addFallThroughNegation(
